@@ -65,12 +65,14 @@ def create_data_loaders(img_root_path, train_file_list, valid_file_list, train_t
 
     train_dataset = TGSSaltDataset(root_path=img_root_path,
                                    file_list=train_file_list,
+                                   type=args.image_type,
                                    mode="train",
                                    transform=train_transformation,
                                    )
 
     valid_dataset = TGSSaltDataset(root_path=img_root_path,
                                    file_list=valid_file_list,
+                                   type=args.image_type,
                                    mode="train",
                                    )
 
