@@ -13,6 +13,18 @@ except ImportError:
 logger = Logger('./logs')
 
 
+def compute_global_accuracy(pred, label):
+    pred = (pred > 0.5).data.cpu().numpy().tolist()
+    label = label.data.cpu().numpy().tolist()
+
+    total = len(label)
+    count = 0.0
+    for i in range(total):
+        if pred[i] == label[i]:
+            count = count + 1.0
+    return float(count) / float(total)
+
+
 def adjust_learning_rate(optimizer, epoch, step_in_epoch, total_steps_in_epoch, ini_lr):
     if epoch > 15:
         epoch = epoch + step_in_epoch / total_steps_in_epoch
@@ -48,20 +60,20 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion, sav
 
             batch_size = len(image)
             if torch.cuda.is_available():
-                image = Variable(image.cuda())
-                mask = Variable(mask.cuda())
+                image = Variable(image.cuda())  # (BatchSize, 3, H, W)
+                mask = Variable(mask.cuda())  # (BatchSize, category), not one-hot-label ?!
             else:
                 image, mask = Variable(image), Variable(mask)
 
             # forward propagation
             mask_pred = net(image)
-            mask_prob = F.sigmoid(mask_pred)    # logistic
+            mask_prob = F.sigmoid(mask_pred)
             mask_prob_flat = mask_prob.view(-1)
 
             true_mask_flat = mask.view(-1)
 
-            loss = criterion(mask_prob_flat, true_mask_flat)    # nn.BCELoss()
-            #loss = criterion(mask_pred, mask, type='sigmoid')  # FocalLoss2d()
+            #loss = criterion(mask_pred, mask, type='sigmoid')
+            loss = criterion(mask_prob_flat, true_mask_flat)
 
             # back propagation
             optimizer.zero_grad()
@@ -70,7 +82,8 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion, sav
 
             train_loss += loss.item()
 
-            # train_acc += compute_global_accuracy(mask_prob_flat, true_mask_flat) * batch_size
+            #mask_prob_flat_threshold = (mask_prob_flat > 0.5).astype(int)
+            train_acc += compute_global_accuracy(mask_prob_flat, true_mask_flat) * batch_size
 
         cur_time = datetime.now()
         h, remainder = divmod((cur_time - prev_time).seconds, 3600)  # math.floor(a/b), a%b
@@ -78,7 +91,7 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion, sav
         time_str = "Time %02d:%02d:%02d" % (h, m, s)
 
         _loss = train_loss / data_size['train']
-        # _acc = train_acc / data_size['train']
+        _acc = train_acc / data_size['train']
 
 
         #
@@ -116,13 +129,12 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion, sav
                     image, mask = Variable(image), Variable(mask)
 
                 mask_pred = net(image)
-                mask_prob = F.sigmoid(mask_pred)    # logistic
-
+                mask_prob = F.sigmoid(mask_pred)
                 mask_prob_flat = mask_prob.view(-1)
                 true_mask_flat = mask.view(-1)
 
-                loss = criterion(mask_prob_flat, true_mask_flat)    # nn.BCELoss()
-                # loss = criterion(mask_pred, mask, type='sigmoid') # FocalLoss2d()
+                # loss = criterion(mask_pred, mask, type='sigmoid')
+                loss = criterion(mask_prob_flat, true_mask_flat)
 
                 valid_loss += loss.item()
 
@@ -132,24 +144,27 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion, sav
                 output_image = np.array(mask_pred[0,:,:,:].cpu().detach().numpy())
                 output_image = reverse_one_hot(output_image)
                 #out_vis_image = helpers.colour_code_segmentation(output_image, label_values)
-
-                valid_acc += compute_global_accuracy(output_image, _mask) * batch_size
                 """
+                valid_acc += compute_global_accuracy(mask_prob_flat, true_mask_flat) * batch_size
 
             _val_loss = valid_loss / data_size['valid']
             _val_acc = valid_acc / data_size['valid']
-
+            """
             epoch_str = ("Epoch %d.  Train Loss: %f, Valid Loss: %f, lr: %f"
-                         % (epoch + 1, _loss, _val_loss, optimizer.param_groups[0]['lr']))
+                            % (epoch+1, _loss, _val_loss, optimizer.param_groups[0]['lr']))
+            """
+            epoch_str = ("Epoch %d.  Train Acc: %f, Train Loss: %f, Valid Acc: %f, Valid Lcc: %f, lr: %f"
+                         % (epoch + 1, _acc, _loss, _val_acc, _val_loss, optimizer.param_groups[0]['lr']))
 
         else:
             epoch_str = ("Epoch %d. Train Loss: %f " % (epoch + 1, _loss))
 
         if save == 'loss':
             if _val_loss < best_loss:
-                torch.save(net.state_dict(), os.path.join("model_params", 
-                           'fold' + str(fold) + '_' + type + '_restnet34_e{}_tls{:.5f}_vls{:.5f}_lr{:.6f}.pth'.\
-                           format(epoch + 1, _loss, _val_loss, optimizer.param_groups[0]['lr'])))
+                torch.save(net.state_dict(),
+                           'fold' + str(fold) + \
+                           '_resize_restnet34_e_params_e{}_tacc{:.4f}_tls{:.5f}_vacc{:.4f}_vls{:.5f}_lr{:.6f}.pth'.\
+                           format(epoch+1, _acc, _loss, _val_acc, _val_loss, optimizer.param_groups[0]['lr']))
 
                 _save = True
                 best_loss = _val_loss

@@ -18,6 +18,8 @@ def create_parser():
                         help='load file model')
     parser.add_argument('-t', '--type', dest='image_type', default='pad', type=str, 
                         help='image type pad or resize')
+    parser.add_argument('-v', '--verification', dest='verification', default=False,
+                        help='verification model')
 
     return parser
 
