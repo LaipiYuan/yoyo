@@ -30,6 +30,7 @@ except ImportError:
 
 
 def train_augment(image, mask):
+
     if np.random.rand() < 0.5:
         image, mask = do_horizontal_flip2(image, mask)
         pass
@@ -61,6 +62,7 @@ def train_augment(image, mask):
 
 
 def create_data_loaders(img_root_path, train_file_list, valid_file_list, train_transformation=None):
+
     train_dataset = TGSSaltDataset(root_path=img_root_path,
                                    file_list=train_file_list,
                                    type=args.image_type,
@@ -76,34 +78,34 @@ def create_data_loaders(img_root_path, train_file_list, valid_file_list, train_t
 
     data_loader = {
         'train': DataLoader(
-            train_dataset,
-            sampler=RandomSampler(train_dataset),
-            batch_size=args.batch_size,
-            drop_last=True,
-            num_workers=8,
-            pin_memory=True,
-        ),
+                        train_dataset,
+                        sampler     = RandomSampler(train_dataset),
+                        batch_size  = args.batch_size,
+                        drop_last   = True,
+                        num_workers = 8,
+                        pin_memory  = True,
+                        ),
         'valid': DataLoader(
-            valid_dataset,
-            sampler=RandomSampler(valid_dataset),
-            batch_size=args.batch_size,
-            drop_last=False,
-            num_workers=8,
-            pin_memory=True,
-        ),
+                        valid_dataset,
+                        sampler     = RandomSampler(valid_dataset),
+                        batch_size  = args.batch_size,
+                        drop_last   = False,
+                        num_workers = 8,
+                        pin_memory  = True,
+                        ),
     }
 
     return data_loader
 
 
-def main(img_root, model_params_path, load=False, verification=False):
+def main(img_root, model_params_path, load=False):
     #
     # DataLoader    -----------------------------------------------------------
     print("####################   Use fold - {}   ####################".format(args.fold))
     print("####################    Image ({})     ####################".format(args.image_type))
 
-    if verification:
-        print("\n**************** verification model\n")
+    if args.verification:
+        print("**************** verification model:\n")
         train_df = pd.read_csv(os.path.join(code_root, "dataset_split", "train_verification.csv"))
         valid_df = pd.read_csv(os.path.join(code_root, "dataset_split", "valid_verification.csv"))
     else:
@@ -133,8 +135,17 @@ def main(img_root, model_params_path, load=False, verification=False):
     if args.load or load:
         model.load_state_dict(torch.load(model_params_path))
 
-    criterion = nn.BCELoss()
-    # criterion = FocalLoss2d()
+    
+    if args.consistency_type == "BCELoss":
+        print("Use BCE Loss")
+        criterion = nn.BCELoss()
+    elif args.consistency_type == "FocalLoss":
+        print("Use Focal Loss")
+        criterion = FocalLoss2d()
+    else:
+        assert False, args.consistency_type
+    
+    #criterion = FocalLoss2d()
 
     optimizer = optim.SGD(filter(lambda p: p.requires_grad, model.parameters()),
                           lr=args.lr, momentum=0.9, weight_decay=0.0001, nesterov=True)
@@ -146,11 +157,11 @@ def main(img_root, model_params_path, load=False, verification=False):
     #
     # train         -----------------------------------------------------------
 
-    # train(model, data_loader, data_size, args.epochs, args.lr, optimizer, criterion, save='loss', fold=args.fold)
+    #train(model, data_loader, data_size, args.epochs, args.lr, optimizer, criterion, save='loss', fold=args.fold)
 
     try:
         train(model, data_loader, data_size, args.epochs, args.lr, optimizer, criterion,
-              save='loss', fold=args.fold, type=args.image_type)
+              save='acc', fold=args.fold, image_type=args.image_type, loss_type=args.consistency_type)
 
     except KeyboardInterrupt:
         torch.save(model.state_dict(), 'INTERRUPTED.pth')
@@ -171,11 +182,11 @@ if __name__ == "__main__":
         img_root = "/home/phymon/dataset/kaggle/TGS_Salt_Identification/train"
     elif args.image_type == "resize":
         img_root = "/home/phymon/liapck/kaggle/TGS_Salt_Identification_128/train"
-
+    
     if not os.path.exists("./model_params"):
         os.mkdir("./model_params")
 
     model_params_name = ""
     model_params_path = os.path.join(code_root, "model_params", model_params_name)
 
-    main(img_root, model_params_path, load=False, verification=args.verification)
+    main(img_root, model_params_path, load=False)

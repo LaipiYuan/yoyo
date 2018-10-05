@@ -7,8 +7,10 @@ from torch.autograd import Variable
 
 try:
     from common.logger import Logger
+    from cli import *
 except ImportError:
     from .common.logger import Logger
+    from .cli import *
 
 logger = Logger('./logs')
 
@@ -36,7 +38,7 @@ def adjust_learning_rate(optimizer, epoch, step_in_epoch, total_steps_in_epoch, 
         param_group['lr'] = lr
 
 
-def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion, save='loss', fold=0, type="pad"):
+def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion, save='acc', fold=0, image_type="pad", loss_type="BCELoss"):
 
     prev_time = datetime.now()
     best_acc = 0.
@@ -60,20 +62,22 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion, sav
 
             batch_size = len(image)
             if torch.cuda.is_available():
-                image = Variable(image.cuda())  # (BatchSize, 3, H, W)
-                mask = Variable(mask.cuda())  # (BatchSize, category), not one-hot-label ?!
+                image = Variable(image.cuda())
+                mask = Variable(mask.cuda())
             else:
                 image, mask = Variable(image), Variable(mask)
 
             # forward propagation
             mask_pred = net(image)
-            mask_prob = F.sigmoid(mask_pred)
+            mask_prob = F.sigmoid(mask_pred)    # logistic
             mask_prob_flat = mask_prob.view(-1)
 
             true_mask_flat = mask.view(-1)
 
-            #loss = criterion(mask_pred, mask, type='sigmoid')
-            loss = criterion(mask_prob_flat, true_mask_flat)
+            if loss_type == "BCELoss":
+                loss = criterion(mask_prob_flat, true_mask_flat)    # nn.BCELoss()
+            elif loss_type == "FocalLoss":
+                loss = criterion(mask_pred, mask, type='sigmoid')  # FocalLoss2d()
 
             # back propagation
             optimizer.zero_grad()
@@ -81,8 +85,6 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion, sav
             optimizer.step()
 
             train_loss += loss.item()
-
-            #mask_prob_flat_threshold = (mask_prob_flat > 0.5).astype(int)
             train_acc += compute_global_accuracy(mask_prob_flat, true_mask_flat) * batch_size
 
         cur_time = datetime.now()
@@ -95,11 +97,11 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion, sav
 
 
         #
-        # TensorBoard         -------------------------------------------------
+        # TensorBoard Log     -------------------------------------------------
 
         # 1. Log scalar values (scalar summary)
-        #info = { 'loss': _loss, 'accuracy': _acc }
-        info = {'loss': _loss}
+        info = { 'loss': _loss, 'accuracy': _acc }
+        #info = {'loss': _loss}
 
         for tag, value in info.items():
             logger.scalar_summary(tag, value, epoch + 1)
@@ -129,12 +131,15 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion, sav
                     image, mask = Variable(image), Variable(mask)
 
                 mask_pred = net(image)
-                mask_prob = F.sigmoid(mask_pred)
+                mask_prob = F.sigmoid(mask_pred)    # logistic
+
                 mask_prob_flat = mask_prob.view(-1)
                 true_mask_flat = mask.view(-1)
 
-                # loss = criterion(mask_pred, mask, type='sigmoid')
-                loss = criterion(mask_prob_flat, true_mask_flat)
+                if loss_type == "BCELoss":
+                    loss = criterion(mask_prob_flat, true_mask_flat)    # nn.BCELoss()
+                elif loss_type == "FocalLoss":
+                    loss = criterion(mask_pred, mask, type='sigmoid') # FocalLoss2d()
 
                 valid_loss += loss.item()
 
@@ -149,25 +154,34 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion, sav
 
             _val_loss = valid_loss / data_size['valid']
             _val_acc = valid_acc / data_size['valid']
-            """
-            epoch_str = ("Epoch %d.  Train Loss: %f, Valid Loss: %f, lr: %f"
-                            % (epoch+1, _loss, _val_loss, optimizer.param_groups[0]['lr']))
-            """
-            epoch_str = ("Epoch %d.  Train Acc: %f, Train Loss: %f, Valid Acc: %f, Valid Lcc: %f, lr: %f"
+
+            epoch_str = ("Epoch %d.  Train Acc: %f, Train Loss: %f, Valid Acc: %f, Valid Loss: %f, lr: %f"
                          % (epoch + 1, _acc, _loss, _val_acc, _val_loss, optimizer.param_groups[0]['lr']))
 
         else:
             epoch_str = ("Epoch %d. Train Loss: %f " % (epoch + 1, _loss))
 
+        #
+        # Save      -----------------------------------------------------------
         if save == 'loss':
             if _val_loss < best_loss:
-                torch.save(net.state_dict(),
-                           'fold' + str(fold) + \
-                           '_resize_restnet34_e_params_e{}_tacc{:.4f}_tls{:.5f}_vacc{:.4f}_vls{:.5f}_lr{:.6f}.pth'.\
-                           format(epoch+1, _acc, _loss, _val_acc, _val_loss, optimizer.param_groups[0]['lr']))
+                torch.save(net.state_dict(), os.path.join("model_params",
+                           'fold' + str(fold) + '_' + image_type + \
+                           '_restnet34_'+ loss_type +'_e{}_tacc{:.4f}_tls{:.5f}_vacc{:.4f}_vls{:.5f}_lr{:.6f}.pth'.\
+                           format(epoch+1, _acc, _loss, _val_acc, _val_loss, optimizer.param_groups[0]['lr'])))
 
                 _save = True
                 best_loss = _val_loss
+
+        elif save == 'acc':
+            if _val_acc > best_acc:
+                torch.save(net.state_dict(), os.path.join("model_params",
+                           'fold' + str(fold) + '_' + image_type + \
+                           '_restnet34_'+ loss_type+'_e{}_tacc{:.4f}_tls{:.5f}_vacc{:.4f}_vls{:.5f}_lr{:.6f}.pth'.\
+                           format(epoch+1, _acc, _loss, _val_acc, _val_loss, optimizer.param_groups[0]['lr'])))
+
+                _save = True
+                best_acc = _val_acc
 
         prev_time = cur_time
         print(epoch_str + ",  " + time_str + ", " + str(int(_save)))

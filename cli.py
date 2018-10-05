@@ -6,20 +6,27 @@ from argparse import ArgumentParser
 def create_parser():
     parser = ArgumentParser(description="Salt Training'")
 
-    parser.add_argument('-f', '--fold', dest='fold', default=9, type=int,
+    parser.add_argument('-t', '--type', dest='image_type', default='pad', type=str, 
+                        choices=['pad', 'resize'],
+                        help='image type pad or resize')
+    parser.add_argument('-f', '--fold', dest='fold', default=5, type=int,
                         help='number of fold')
-    parser.add_argument('-e', '--epochs', dest='epochs', default=150, type=int,
+
+    parser.add_argument('-e', '--epochs', dest='epochs', default=200, type=int,
                         help='number of epochs')
     parser.add_argument('-b', '--batch-size', dest='batch_size', default=25, type=int, metavar='N',
                         help='batch size')
     parser.add_argument('--lr', '--learning-rate', dest='lr', default=0.005, type=float,
                         help='learning rate')
-    parser.add_argument('-c', '--load', dest='load', default=False,
-                        help='load file model')
-    parser.add_argument('-t', '--type', dest='image_type', default='pad', type=str, 
-                        help='image type pad or resize')
+
     parser.add_argument('-v', '--verification', dest='verification', default=False,
                         help='verification model')
+    parser.add_argument('-w', '--load', dest='load', default=False,
+                        help='load file model')
+
+    parser.add_argument('-l', '--loss', '--consistency-type', dest='consistency_type', default='BCE', type=str, 
+                        choices=['BCELoss', 'FocalLoss'],
+                        help='consistency loss type to use')
 
     return parser
 
