@@ -126,4 +126,4 @@ if __name__ == "__main__":
     model = UNet(in_channel=3, n_classes=1)
     model = model.to(device)
 
-    summary(model, (3, 96, 96))
+    summary(model, (3, 128, 128))
