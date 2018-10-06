@@ -12,11 +12,13 @@ def create_parser():
     parser.add_argument('-f', '--fold', dest='fold', default=5, type=int,
                         help='number of fold')
 
+    parser.add_argument('-d', '--depth', dest='depth', default=34, type=int,
+                        help='depth of ResNet')
     parser.add_argument('-e', '--epochs', dest='epochs', default=200, type=int,
                         help='number of epochs')
-    parser.add_argument('-b', '--batch-size', dest='batch_size', default=25, type=int, metavar='N',
+    parser.add_argument('-b', '--batch-size', dest='batch_size', default=25, type=int,
                         help='batch size')
-    parser.add_argument('--lr', '--learning-rate', dest='lr', default=0.005, type=float,
+    parser.add_argument('--lr', '--learning-rate', dest='learning_rate', default=0.005, type=float,
                         help='learning rate')
 
     parser.add_argument('-v', '--verification', dest='verification', default=False,
@@ -24,7 +26,7 @@ def create_parser():
     parser.add_argument('-w', '--load', dest='load', default=False,
                         help='load file model')
 
-    parser.add_argument('-l', '--loss', '--consistency-type', dest='consistency_type', default='BCE', type=str, 
+    parser.add_argument('-l', '--loss', '--consistency-type', dest='consistency_type', default='BCELoss', type=str, 
                         choices=['BCELoss', 'FocalLoss'],
                         help='consistency loss type to use')
 
@@ -55,3 +57,5 @@ def parse_dict_args(**kwargs):
 if __name__ == "__main__":
 
     args = parse_commandline_args()
+
+

@@ -126,7 +126,7 @@ def main(img_root, model_params_path, load=False):
     # Model         -----------------------------------------------------------
 
     # model = unet.UNet(in_channel=1, n_classes=1)
-    model = unetresnet.UNetResNet(encoder_depth=34, num_classes=1)
+    model = unetresnet.UNetResNet(encoder_depth=args.depth, num_classes=1)
     # model = unetfrog.SaltNet()
 
     if torch.cuda.is_available():
@@ -134,6 +134,7 @@ def main(img_root, model_params_path, load=False):
 
     if args.load or load:
         model.load_state_dict(torch.load(model_params_path))
+        print("**********   Load Model Finished   **********")
 
     
     if args.consistency_type == "BCELoss":
@@ -148,7 +149,7 @@ def main(img_root, model_params_path, load=False):
     #criterion = FocalLoss2d()
 
     optimizer = optim.SGD(filter(lambda p: p.requires_grad, model.parameters()),
-                          lr=args.lr, momentum=0.9, weight_decay=0.0001, nesterov=True)
+                          lr=args.learning_rate, momentum=0.9, weight_decay=0.0001, nesterov=True)
     """
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()),
                              lr=learning_rate, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
@@ -158,10 +159,11 @@ def main(img_root, model_params_path, load=False):
     # train         -----------------------------------------------------------
 
     #train(model, data_loader, data_size, args.epochs, args.lr, optimizer, criterion, save='loss', fold=args.fold)
+    _load = args.load or load
 
     try:
-        train(model, data_loader, data_size, args.epochs, args.lr, optimizer, criterion,
-              save='acc', fold=args.fold, image_type=args.image_type, loss_type=args.consistency_type)
+        train(model, data_loader, data_size, args.epochs, args.learning_rate, optimizer, criterion,
+              save='acc', fold=args.fold, image_type=args.image_type, loss_type=args.consistency_type, depth=args.depth, load=_load)
 
     except KeyboardInterrupt:
         torch.save(model.state_dict(), 'INTERRUPTED.pth')
@@ -186,7 +188,7 @@ if __name__ == "__main__":
     if not os.path.exists("./model_params"):
         os.mkdir("./model_params")
 
-    model_params_name = ""
-    model_params_path = os.path.join(code_root, "model_params", model_params_name)
+    model_params_name = "fold3_restnet34_e_params_e71_tls0.00213_vls0.00414_lr0.002450.pth"
+    model_params_path = os.path.join(code_root, "model_params_prev", model_params_name)
 
     main(img_root, model_params_path, load=False)

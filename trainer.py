@@ -27,18 +27,27 @@ def compute_global_accuracy(pred, label):
     return float(count) / float(total)
 
 
-def adjust_learning_rate(optimizer, epoch, step_in_epoch, total_steps_in_epoch, ini_lr):
-    if epoch > 15:
-        epoch = epoch + step_in_epoch / total_steps_in_epoch
-        lr = ini_lr * 0.99 ** epoch
+def adjust_learning_rate(optimizer, epoch, step_in_epoch, total_steps_in_epoch, ini_lr, load=False):
+    if load:
+        if epoch > 1:
+            epoch = epoch + step_in_epoch / total_steps_in_epoch + 50
+            lr = ini_lr * 0.99 ** epoch
+        else:
+            lr = ini_lr
     else:
-        lr = ini_lr
+        if epoch > 15:
+            epoch = epoch + step_in_epoch / total_steps_in_epoch
+            lr = ini_lr * 0.99 ** epoch
+        else:
+            lr = ini_lr
+
 
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
 
-def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion, save='acc', fold=0, image_type="pad", loss_type="BCELoss"):
+def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion, 
+            save='acc', fold=0, image_type="pad", loss_type="BCELoss", depth=34, load=False):
 
     prev_time = datetime.now()
     best_acc = 0.
@@ -58,7 +67,7 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion, sav
         # Train     -----------------------------------------------------------
 
         for i, (image, mask) in enumerate(data_loader['train']):
-            adjust_learning_rate(optimizer, epoch, i, len(data_loader['train']), lr)
+            adjust_learning_rate(optimizer, epoch, i, len(data_loader['train']), lr, load)
 
             batch_size = len(image)
             if torch.cuda.is_available():
@@ -116,9 +125,9 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion, sav
         # Validation          -------------------------------------------------
 
         if data_loader['valid'] is not None:
-            valid_loss = 0
-            valid_acc = 0
-            valid_iou = 0
+            valid_loss = 0.
+            valid_acc = 0.
+            valid_iou = 0.
 
             net = net.eval()
 
@@ -167,7 +176,7 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion, sav
             if _val_loss < best_loss:
                 torch.save(net.state_dict(), os.path.join("model_params",
                            'fold' + str(fold) + '_' + image_type + \
-                           '_restnet34_'+ loss_type +'_e{}_tacc{:.4f}_tls{:.5f}_vacc{:.4f}_vls{:.5f}_lr{:.6f}.pth'.\
+                           '_restnet' + str(depth) + '_'+ loss_type +'_e{}_tacc{:.4f}_tls{:.5f}_vacc{:.4f}_vls{:.5f}_lr{:.6f}.pth'.\
                            format(epoch+1, _acc, _loss, _val_acc, _val_loss, optimizer.param_groups[0]['lr'])))
 
                 _save = True
@@ -177,7 +186,7 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion, sav
             if _val_acc > best_acc:
                 torch.save(net.state_dict(), os.path.join("model_params",
                            'fold' + str(fold) + '_' + image_type + \
-                           '_restnet34_'+ loss_type+'_e{}_tacc{:.4f}_tls{:.5f}_vacc{:.4f}_vls{:.5f}_lr{:.6f}.pth'.\
+                           '_restnet' + str(depth) + '_'+ loss_type+'_e{}_tacc{:.4f}_tls{:.5f}_vacc{:.4f}_vls{:.5f}_lr{:.6f}.pth'.\
                            format(epoch+1, _acc, _loss, _val_acc, _val_loss, optimizer.param_groups[0]['lr'])))
 
                 _save = True
@@ -187,3 +196,4 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion, sav
         print(epoch_str + ",  " + time_str + ", " + str(int(_save)))
 
         _save = False
+
