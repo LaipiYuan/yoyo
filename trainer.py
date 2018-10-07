@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+import numpy as np
 
 from torch.utils.data.sampler import *
 import torch.nn.functional as F
@@ -12,17 +13,49 @@ except ImportError:
     from .common.logger import Logger
     from .cli import *
 
+
 logger = Logger('./logs')
 
 
-def compute_global_accuracy(pred, label):
-    pred = (pred > 0.5).data.cpu().numpy().tolist()
-    label = label.data.cpu().numpy().tolist()
+def compute_iou2(pred, mask):
+    batch_size = mask.shape[0]
+    metric = []
+    for batch in range(batch_size):
+        p, t = pred[batch].data.cpu().numpy() > 0.5, mask[batch].data.cpu().numpy() > 0.5
+        
+        intersection = np.logical_and(p, t)
+        union = np.logical_or(p, t)
+        iou = (np.sum(intersection > 0) + 1e-10 )/ (np.sum(union > 0) + 1e-10)
 
-    total = len(label)
+        thresholds = np.arange(0.5, 1, 0.05)
+        s = []
+        for thresh in thresholds:
+            s.append(iou > thresh)
+        metric.append(np.mean(s))
+
+    return np.mean(metric)
+
+
+def compute_iou(pred, mask):
+    pred = (pred > 0.5).data.cpu().numpy()
+    mask = mask.data.cpu().numpy()
+    total = len(mask)
+
+    intersection = np.logical_and(pred, mask)
+    union = np.logical_or(pred, mask)
+    iou = (np.sum(intersection > 0) + 1e-12) / (np.sum(union > 0) + 1e-12)
+
+    return iou
+
+
+def compute_accuracy(pred, mask):
+    pred = (pred > 0.5).data.cpu().numpy().tolist()
+    mask = mask.data.cpu().numpy().tolist()
+
+    total = len(mask)
     count = 0.0
     for i in range(total):
-        if pred[i] == label[i]:
+        if pred[i] == mask[i]:
             count = count + 1.0
     return float(count) / float(total)
 
@@ -30,7 +63,7 @@ def compute_global_accuracy(pred, label):
 def adjust_learning_rate(optimizer, epoch, step_in_epoch, total_steps_in_epoch, ini_lr, load=False):
     if load:
         if epoch > 1:
-            epoch = epoch + step_in_epoch / total_steps_in_epoch + 50
+            epoch = epoch + step_in_epoch / total_steps_in_epoch + 80
             lr = ini_lr * 0.99 ** epoch
         else:
             lr = ini_lr
@@ -60,6 +93,7 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion,
         train_loss = 0.
         train_acc = 0.
         train_iou = 0.
+        train_iou2 = 0.
 
         net = net.train()
 
@@ -94,7 +128,9 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion,
             optimizer.step()
 
             train_loss += loss.item()
-            train_acc += compute_global_accuracy(mask_prob_flat, true_mask_flat) * batch_size
+            train_acc += compute_accuracy(mask_prob_flat, true_mask_flat) * batch_size
+            train_iou += compute_iou(mask_prob_flat, true_mask_flat) * batch_size
+            train_iou2 += compute_iou2(mask_prob, mask) * batch_size
 
         cur_time = datetime.now()
         h, remainder = divmod((cur_time - prev_time).seconds, 3600)  # math.floor(a/b), a%b
@@ -103,6 +139,8 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion,
 
         _loss = train_loss / data_size['train']
         _acc = train_acc / data_size['train']
+        _iou = train_iou / data_size['train']
+        _iou2 = train_iou2 / data_size['train']
 
 
         #
@@ -128,6 +166,7 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion,
             valid_loss = 0.
             valid_acc = 0.
             valid_iou = 0.
+            valid_iou2 = 0.
 
             net = net.eval()
 
@@ -159,13 +198,21 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion,
                 output_image = reverse_one_hot(output_image)
                 #out_vis_image = helpers.colour_code_segmentation(output_image, label_values)
                 """
-                valid_acc += compute_global_accuracy(mask_prob_flat, true_mask_flat) * batch_size
+                valid_acc += compute_accuracy(mask_prob_flat, true_mask_flat) * batch_size
+                valid_iou += compute_iou(mask_prob_flat, true_mask_flat) * batch_size
+                valid_iou2 += compute_iou2(mask_prob, mask) * batch_size
 
             _val_loss = valid_loss / data_size['valid']
             _val_acc = valid_acc / data_size['valid']
+            _val_iou = valid_iou / data_size['valid']
+            _val_iou2 = valid_iou2 / data_size['valid']
 
+            """
             epoch_str = ("Epoch %d.  Train Acc: %f, Train Loss: %f, Valid Acc: %f, Valid Loss: %f, lr: %f"
                          % (epoch + 1, _acc, _loss, _val_acc, _val_loss, optimizer.param_groups[0]['lr']))
+            """
+            epoch_str = ("Epoch %d.  Train Acc: %.4f, Train Loss: %.5f, Train IoU: %.4f  |  Valid Acc: %.4f, Valid Loss: %.5f, Valid IoU: %.4f  |  lr: %.6f"
+                         % (epoch + 1, _acc, _loss, _iou, _val_acc, _val_loss, _val_iou, optimizer.param_groups[0]['lr']))
 
         else:
             epoch_str = ("Epoch %d. Train Loss: %f " % (epoch + 1, _loss))
@@ -194,6 +241,7 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion,
 
         prev_time = cur_time
         print(epoch_str + ",  " + time_str + ", " + str(int(_save)))
+        print("Train IoU: ", _iou2, "\tValid IoU: ", _val_iou2)
 
         _save = False
 
