@@ -62,15 +62,15 @@ def compute_accuracy(pred, mask):
 
 def adjust_learning_rate(optimizer, epoch, step_in_epoch, total_steps_in_epoch, ini_lr, load=False):
     if load:
-        if epoch > 1:
-            epoch = epoch + step_in_epoch / total_steps_in_epoch + 80
+        if epoch >= 0:
+            epoch = epoch + step_in_epoch / total_steps_in_epoch + 200
             lr = ini_lr * 0.99 ** epoch
         else:
             lr = ini_lr
     else:
         if epoch > 15:
             epoch = epoch + step_in_epoch / total_steps_in_epoch
-            lr = ini_lr * 0.99 ** epoch
+            lr = ini_lr * (0.99 ** epoch)
         else:
             lr = ini_lr
 
@@ -223,25 +223,25 @@ def train(net, data_loader, data_size, num_epochs, lr, optimizer, criterion,
             if _val_loss < best_loss:
                 torch.save(net.state_dict(), os.path.join("model_params",
                            'fold' + str(fold) + '_' + image_type + \
-                           '_restnet' + str(depth) + '_'+ loss_type +'_e{}_tacc{:.4f}_tls{:.5f}_vacc{:.4f}_vls{:.5f}_lr{:.6f}.pth'.\
-                           format(epoch+1, _acc, _loss, _val_acc, _val_loss, optimizer.param_groups[0]['lr'])))
+                           '_restnet' + str(depth) + '_'+ loss_type +'_e{}_tacc{:.4f}_tls{:.5f}_vacc{:.4f}_vls{:.5f}_viou{:.4f}_lr{:.6f}.pth'.\
+                           format(epoch+1, _acc, _loss, _val_acc, _val_loss, _val_iou2, optimizer.param_groups[0]['lr'])))
 
                 _save = True
                 best_loss = _val_loss
 
         elif save == 'acc':
             if _val_acc > best_acc:
-                torch.save(net.state_dict(), os.path.join("model_params",
+                torch.save(net.state_dict(), os.path.join("model_params_152",
                            'fold' + str(fold) + '_' + image_type + \
-                           '_restnet' + str(depth) + '_'+ loss_type+'_e{}_tacc{:.4f}_tls{:.5f}_vacc{:.4f}_vls{:.5f}_lr{:.6f}.pth'.\
-                           format(epoch+1, _acc, _loss, _val_acc, _val_loss, optimizer.param_groups[0]['lr'])))
+                           '_restnet' + str(depth) + '_'+ loss_type+'_e194_e{}_tacc{:.4f}_tls{:.5f}_vacc{:.4f}_vls{:.5f}_viou{:.4f}_lr{:.6f}.pth'.\
+                           format(epoch+1, _acc, _loss, _val_acc, _val_loss, _val_iou2, optimizer.param_groups[0]['lr'])))
 
                 _save = True
                 best_acc = _val_acc
 
         prev_time = cur_time
         print(epoch_str + ",  " + time_str + ", " + str(int(_save)))
-        print("Train IoU: ", _iou2, "\tValid IoU: ", _val_iou2)
+        print("Train IoU: %.4f, \tValid IoU: %.4f" % (_iou2, _val_iou2))
 
         _save = False
 

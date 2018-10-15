@@ -23,7 +23,7 @@ except ImportError:
 def create_parser():
     parser = ArgumentParser(description="Salt Submit'")
 
-    parser.add_argument('-d', '--depth', dest='depth', default=34, type=int,
+    parser.add_argument('-d', '--depth', dest='depth', default=152, type=int,
                         help='depth of ResNet')
     parser.add_argument('-t', '--type', dest='image_type', default='pad', type=str,
                         choices=['pad', 'resize'],
@@ -85,6 +85,8 @@ def predict_mask(net, img, image_type, out_threshold=0.5):
         image = Variable(image.cuda())
     else:
         image = Variable(image)
+
+    net = net.eval()
 
     with torch.no_grad():
         mask_pred = net(image)
@@ -257,8 +259,9 @@ if __name__ == "__main__":
     if not os.path.exists("./submit_file"):
         os.mkdir("./submit_file")
 
-    model_params_name = "fold5_pad_restnet34_BCELoss_e80_tacc0.9869_tls0.00137_vacc0.9768_vls0.00307_lr0.000537.pth"
-    model_params_path = os.path.join(code_root, "model_params", model_params_name)
+    model_params_name = "fold1_pad_restnet152_BCELoss_e154_tacc0.9927_tls0.00123_vacc0.9816_vls0.00624_lr0.000129_lb788.pth"
+    #model_params_path = os.path.join(code_root, "model_params", model_params_name)
+    model_params_path = os.path.join(code_root, "model_params_041", model_params_name)
 
 
     #
@@ -277,7 +280,7 @@ if __name__ == "__main__":
 
     print("**********   Load Model Finished   **********")
 
-    main(out_threshold=0.489548)
+    main(out_threshold=0.5) # 0.4895482253187
 
 
 

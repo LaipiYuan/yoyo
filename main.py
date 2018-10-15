@@ -134,7 +134,7 @@ def main(img_root, model_params_path, load=False):
 
     if args.load or load:
         model.load_state_dict(torch.load(model_params_path))
-        print("**********   Load Model Finished   **********")
+        print("**********   Load Model - {} Finished   **********".format(model_params_name))
 
     
     if args.consistency_type == "BCELoss":
@@ -148,13 +148,14 @@ def main(img_root, model_params_path, load=False):
     
     #criterion = FocalLoss2d()
 
+    
     optimizer = optim.SGD(filter(lambda p: p.requires_grad, model.parameters()),
                           lr=args.learning_rate, momentum=0.9, weight_decay=0.0001, nesterov=True)
     """
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()),
-                             lr=learning_rate, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
+                             lr=args.learning_rate, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
+    
     """
-
     #
     # train         -----------------------------------------------------------
 
@@ -188,7 +189,8 @@ if __name__ == "__main__":
     if not os.path.exists("./model_params"):
         os.mkdir("./model_params")
 
-    model_params_name = "fold3_restnet34_e_params_e71_tls0.00213_vls0.00414_lr0.002450.pth"
-    model_params_path = os.path.join(code_root, "model_params_prev", model_params_name)
+    model_params_name = "fold9_pad_restnet152_BCELoss_e194_tacc0.9876_tls0.00407_vacc0.9791_vls0.01009_viou0.7733_lr0.000712.pth"
+    model_params_path = os.path.join(code_root, "model_params_152", model_params_name)
+    #model_params_path = os.path.join(code_root, "model_params", model_params_name)
 
     main(img_root, model_params_path, load=False)

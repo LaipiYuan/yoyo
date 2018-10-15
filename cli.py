@@ -12,11 +12,11 @@ def create_parser():
     parser.add_argument('-f', '--fold', dest='fold', default=5, type=int,
                         help='number of fold')
 
-    parser.add_argument('-d', '--depth', dest='depth', default=34, type=int,
+    parser.add_argument('-d', '--depth', dest='depth', default=152, type=int,
                         help='depth of ResNet')
-    parser.add_argument('-e', '--epochs', dest='epochs', default=200, type=int,
+    parser.add_argument('-e', '--epochs', dest='epochs', default=300, type=int,
                         help='number of epochs')
-    parser.add_argument('-b', '--batch-size', dest='batch_size', default=25, type=int,
+    parser.add_argument('-b', '--batch-size', dest='batch_size', default=8, type=int,
                         help='batch size')
     parser.add_argument('--lr', '--learning-rate', dest='learning_rate', default=0.005, type=float,
                         help='learning rate')
