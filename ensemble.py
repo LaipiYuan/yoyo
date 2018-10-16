@@ -137,12 +137,12 @@ def run_tta_predict(model, img_root, image_type, augment, fold):
 
     #all_prob = np.concatenate(all_prob)
     all_prob = np.array(all_prob)
-    all_prob = (all_prob * 255).astype(np.uint8)
+    all_prob = (all_prob * 255)#.astype(np.uint8)
     np.save(os.path.join(code_root, 'ensemble', '%s_%s.prob.uint8.npy' % (fold, augment)), all_prob)
     print(all_prob.shape)
 
 
-def run_submit(augment, fold):
+def run_submit(augment, fold, threshold=0.5):
     if augment in ['null', 'flip_rl']:
         augmentation = [
             1, os.path.join(code_root, 'ensemble', '%s_%s.prob.uint8.npy' % (fold, augment)),
@@ -160,15 +160,17 @@ def run_submit(augment, fold):
     #
     # Ensemble      -----------------------------------------------------------
     w, augment_file = augmentation[0]
-    all_prob = w * np.load(augment_file).astype(np.float32) / 255
+    all_prob = w * np.load(augment_file).astype(np.float64) / 255
+
     all_w = w
     for i in range(1, num_augments):
         w, augment_file = augmentation[i]
-        prob = w * np.load(augment_file).astype(np.float32) / 255
+        prob = w * np.load(augment_file).astype(np.float64) / 255
         all_prob += prob
         all_w += w
+
     all_prob /= all_w
-    all_prob = all_prob > 0.5
+    all_prob = all_prob > threshold
     print(all_prob.shape)
 
     #
@@ -219,7 +221,7 @@ def main(model_params_path):
 
     if args.submit:
         for tta in ['null', 'flip_rl', 'tta_ensemble']:
-            run_submit(tta, fold=model_params_name[:5])
+            run_submit(tta, fold=model_params_name[:5], threshold=0.546543706)
 
 
 if __name__ == "__main__":
