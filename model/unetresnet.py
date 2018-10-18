@@ -2,7 +2,11 @@ from torch import nn
 from torch.nn import functional as F
 import torch
 import torchvision
-from .resnet import *
+
+try:
+    from resnet import *
+except ImportError:
+    from .resnet import *
 
 from torchsummary import summary
 
@@ -155,7 +159,8 @@ class SaltUNet(nn.Module):
         self.num_classes = num_classes
         self.dropout_2d = dropout_2d
 
-        self.encoder = torchvision.models.resnet34(pretrained=pretrained)
+        #self.encoder = torchvision.models.resnet34(pretrained=pretrained)
+        self.encoder = resnet34(pretrained=pretrained)
 
         self.relu = nn.ReLU(inplace=True)
 
@@ -194,7 +199,8 @@ class SaltLinkNet(nn.Module):
         self.dropout_2d = dropout_2d
         self.mode = None
 
-        self.encoder = torchvision.models.resnet34(pretrained=pretrained)
+        #self.encoder = torchvision.models.resnet34(pretrained=pretrained)
+        self.encoder = resnet34(pretrained=pretrained)
 
         self.relu = nn.ReLU(inplace=True)
 
@@ -283,7 +289,11 @@ if __name__ == "__main__":
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    model = UNetResNet(encoder_depth=152, num_classes=1)
+    #model = UNetResNet(encoder_depth=34, num_classes=1)
+    #model = SaltUNet(num_classes=1)
+    model = SaltLinkNet(num_classes=1)
     model = model.to(device)
 
-    summary(model, (3, 128, 128))
+    summary(model, (1, 128, 128))
+
+
