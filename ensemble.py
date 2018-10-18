@@ -23,7 +23,7 @@ except ImportError:
 def create_parser():
     parser = ArgumentParser(description="Salt Submit'")
 
-    parser.add_argument('-d', '--depth', dest='depth', default=152, type=int,
+    parser.add_argument('-d', '--depth', dest='depth', default=34, type=int,
                         help='depth of ResNet')
     parser.add_argument('-t', '--type', dest='image_type', default='pad', type=str,
                         choices=['pad', 'resize'],
@@ -137,21 +137,21 @@ def run_tta_predict(model, img_root, image_type, augment, fold):
 
     #all_prob = np.concatenate(all_prob)
     all_prob = np.array(all_prob)
-    all_prob = (all_prob * 255)#.astype(np.uint8)
-    np.save(os.path.join(code_root, 'ensemble', '%s_%s.prob.uint8.npy' % (fold, augment)), all_prob)
+    all_prob = (all_prob * 255).astype(np.float32)
+    np.save(os.path.join(code_root, 'ensemble', '%s_%s.prob.float32.npy' % (fold, augment)), all_prob)
     print(all_prob.shape)
 
 
 def run_submit(augment, fold, threshold=0.5):
     if augment in ['null', 'flip_rl']:
         augmentation = [
-            1, os.path.join(code_root, 'ensemble', '%s_%s.prob.uint8.npy' % (fold, augment)),
+            1, os.path.join(code_root, 'ensemble', '%s_%s.prob.float32.npy' % (fold, augment)),
         ]
 
     if augment == 'tta_ensemble':
         augmentation = [
-            1, os.path.join(code_root, 'ensemble', '%s_%s.prob.uint8.npy' % (fold, 'null')),
-            1, os.path.join(code_root, 'ensemble', '%s_%s.prob.uint8.npy' % (fold, 'flip_rl')),
+            1, os.path.join(code_root, 'ensemble', '%s_%s.prob.float32.npy' % (fold, 'null')),
+            1, os.path.join(code_root, 'ensemble', '%s_%s.prob.float32.npy' % (fold, 'flip_rl')),
         ]
 
     augmentation = np.array(augmentation, dtype=object).reshape(-1, 2)
@@ -160,12 +160,12 @@ def run_submit(augment, fold, threshold=0.5):
     #
     # Ensemble      -----------------------------------------------------------
     w, augment_file = augmentation[0]
-    all_prob = w * np.load(augment_file).astype(np.float64) / 255
+    all_prob = w * np.load(augment_file).astype(np.float32) / 255
 
     all_w = w
     for i in range(1, num_augments):
         w, augment_file = augmentation[i]
-        prob = w * np.load(augment_file).astype(np.float64) / 255
+        prob = w * np.load(augment_file).astype(np.float32) / 255
         all_prob += prob
         all_w += w
 
